@@ -3,7 +3,7 @@
 #include "TLatex.h"
 #include "TLegend.h"
 #include "TTree.h"
-#include <math.h>       /* std::abs */
+#include <math.h>
 
 bool HFrame::writeToRootFile(std::string sfile, std::string sname){
   if( !h_frame ) return false;
@@ -13,25 +13,22 @@ bool HFrame::writeToRootFile(std::string sfile, std::string sname){
   TFile * f0 = new TFile( sfile.c_str(), "recreate");
 
   TH2F* h2 = (TH2F*) h_frame->Clone((sname).c_str());
-  //TH2F* h2 = new TH2F("test", "", 10, 0., 10., 10, 10.,20.);
-
   h2 ->SetDirectory(f0); 
   h2->Write();
   delete h2;
   for (auto h1 : h_lines){
-    std::string s1 = std::string(h1->GetName()); // + "_h1";
+    std::string s1 = std::string(h1->GetName()); 
     TH1F* h1x = (TH1F*) h1->Clone(s1.c_str());
     h1x -> Write();
     delete h1x;
   }
-
   f0->Close();
   delete f0;
-
   return true;
 }
 
 bool HFrame::fillboxTrees(std::vector<std::string> sfiles, std::string shout, std::string stree, std::string stemp, std::string sxbrh, std::string sybrh){
+  // create a 2D Histogram, if it doesn't exist.
   if (!h_frame) h_frame = new TH2F( shout.c_str(), "", NXPIX, 0., cmperpix * NXPIX, NYPIX, 0., cmperpix * NYPIX);
   h_frame -> SetDirectory(NULL);
 
@@ -64,7 +61,7 @@ bool HFrame::fillboxTrees(std::vector<std::string> sfiles, std::string shout, st
     for (int je=0;je<nentry;je++){
       t1->GetEntry(je);
 
-      // in tree file, position starting from 0, why ???????
+      // in tree file, position starting from 0, why ??!!
       xpos += 1;
       ypos += 1;
 
@@ -128,7 +125,6 @@ bool HFrame::fillboxHist(std::string sfile, std::string sname, bool convert_to_c
   }
   if (!h_frame) return false;
 
-  //h_frame -> SetName(sname.c_str());
   return true;
 }
 
@@ -170,7 +166,8 @@ bool HFrame::mirror( bool byX){
   for (int ix=1; ix<=nbinx; ix++){
     for (int iy=1; iy<=nbiny; iy++){
 
-      unsigned int tmp_ix = ix, tmp_iy = nbiny - iy + 1; // by X, change Y
+      // mirror image by X, then change Y
+      unsigned int tmp_ix = ix, tmp_iy = nbiny - iy + 1;
       if(!byX){ tmp_ix = nbinx - ix + 1; tmp_iy = iy; }
 
       float temperature = h_tmp->GetBinContent(ix, iy);
@@ -194,16 +191,17 @@ bool HFrame::crop( int x1, int y1, int x2, int y2, int x3, int y3, bool convert_
   TH2F* h_tmp = (TH2F*) h_frame->Clone("h_tmp");
   std::string sname = static_cast<std::string>(h_frame -> GetName());
   delete h_frame;
+
   float xmax = float(nbinx), ymax = float(nbiny);
   if(convert_to_cm){
     xmax = cmperpix * nbinx;
     ymax = cmperpix * nbiny;
   }
 
+  // Histogram starts from 0. always --> can be changed to point x1,y1.
   h_frame = new TH2F(sname.c_str(), "", nbinx, 0., xmax, nbiny, 0., ymax);
   h_frame -> GetXaxis() -> SetTitle( h_tmp -> GetXaxis() -> GetTitle() );
   h_frame -> GetYaxis() -> SetTitle( h_tmp -> GetYaxis() -> GetTitle() );
-  std::cout<<"in crop, x title "<<h_tmp -> GetXaxis() -> GetTitle()<<std::endl;
 
   for (int ix=1; ix<=nbinx; ix++){
     for (int iy=1; iy<=nbiny; iy++){
@@ -233,7 +231,7 @@ TH1F* HFrame::getLine(int x1, int y1, int x2, int y2, bool m_record){
   }
   if(nbin<=1) return NULL;
 
-  std::string sname = "frame1D_";//std::string(h_frame->GetName());
+  std::string sname = "line_";
   sname += Form("x%dy%d_x%dy%d",x1,y1,x2,y2);
   TH1F* h1 = new TH1F(sname.c_str(),"",nbin,0.,float(nbin));
 
@@ -248,7 +246,9 @@ TH1F* HFrame::getLine(int x1, int y1, int x2, int y2, bool m_record){
 
       float temperature = h_frame->GetBinContent(tmp_ix, tmp_iy);
       float temp_error  = h_frame->GetBinError(tmp_ix, tmp_iy);
-      // if no error, fitting 1 D histogram wouldn't work.
+
+      // if a 1D Histogram has no error, fitting wouldn't work!!
+      // set the error of 0.1 C!
       if (temp_error <=0.) temp_error = 0.1;
 
       h1 -> SetBinContent(ib, temperature);

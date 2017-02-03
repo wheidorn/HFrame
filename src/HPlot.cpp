@@ -7,11 +7,6 @@
 #include "TF1.h"
 #include <math.h>
 
-bool HPlot::drawOneLine(HFrame * m_fbox, std::string lname){
-
-  return true;
-}
-
 void HPlot::getCanvasMarginOffset(float frac, float &xcan, float &margin_left, float &margin_right, float &margin_bottom, float &margin_top, float &xoff, float &yoff, float &zoff, bool is_2D){
   if( frac >= 1.2 && frac < 1.5){
     xcan = 700; margin_left = 0.09; margin_right = 0.14; margin_top = 0.05; margin_bottom = 0.12;
@@ -87,7 +82,7 @@ bool HPlot::drawFrame2D(HFrame * fbox, float ValMin, float ValMax){
   h2->SetTitle("");
   h2->Draw("COLZ");
   TLatex Tl; Tl.SetTextSize(20); Tl.SetTextFont(43);
-  Tl.DrawLatex(h2->GetXaxis()->GetXmax()*0.7, h2->GetYaxis()->GetXmax() * 1.01 , (fbox->getTitle()).c_str());
+  Tl.DrawLatex(h2->GetXaxis()->GetXmax()*0.7, h2->GetYaxis()->GetXmax() * 1.01 , h2->GetTitle());
   sout += "COLZ_";
   c0->Print( (sout+fName+".png").c_str());
 

@@ -5,10 +5,7 @@
 #include "TROOT.h"
 #include "TStyle.h"
 #include <math.h>
-
 #include "TF1.h"
-#include "func.h"
-
 
 bool HTools::fitPipeTwoGaus(HFrame * fbox, std::string s_out, int x_min, int x_max, int y_min, int y_max, bool negative, bool convert_to_cm){
   if(!fbox) return false;
@@ -41,21 +38,18 @@ bool HTools::fitPipeTwoGaus(HFrame * fbox, std::string s_out, int x_min, int x_m
   double pars[npars];
   for(int ix=x_min; ix<=x_max; ix++){
 
-
-    // h0 histogram with pixels.
-    //TH1F* h0 = fbox->getLine(ix, 1, ix, nbiny);
     TH1F* h0 = fbox->getLine(ix, y_min, ix, y_max);
     TH1F* h1 = (TH1F*) h0 -> Clone( h0->GetName() + char('X') );
     if (!h1){ std::cout<<"error finding the line in fit "<<std::endl; return false;}
 
      // find the x position of Y min or max
      // then set up the fit range around the min or max
-    int ib_mmy_1 = 0., ib_mmy_2 = 0.; // mm = max or min
+     //
+     // mm = max or min
+    int ib_mmy_1 = 0., ib_mmy_2 = 0.; 
     double mmy_1 = -99., mmy_2 = -99.;
     if(negative){mmy_1 = 9999.; mmy_2 = 9999.;}
     int y_thr = h1->GetNbinsX() / 3;
-
-    std::cout<<" bins y for fit "<<h1->GetNbinsX()<<std::endl;
 
     for(int ib=1; ib<=h1->GetNbinsX(); ib++){
       if (ib<= y_thr){
@@ -76,9 +70,8 @@ bool HTools::fitPipeTwoGaus(HFrame * fbox, std::string s_out, int x_min, int x_m
     TF1 *tfs2 = new TF1("SigFuncTwo","gaus", float( ib_mmy_2 - 4.), (ib_mmy_2 + 3 <= nbiny ? float(ib_mmy_2 + 3) : float(nbiny)) );
 
     TCanvas *c1 = new TCanvas("c1","c1",10,10,600,600);
-    h1->SetMaximum( h1->GetMaximum() * 1.2);
     if(negative) h1->SetMaximum( h1->GetMaximum() * 0.75);
-    //h1->SetMinimum( h0->GetMinimum());
+    else         h1->SetMaximum( h1->GetMaximum() * 1.25);
     h1->SetLineWidth(3);
     h1->SetLineColor(1);
     h1->SetMarkerStyle(23);
@@ -86,16 +79,13 @@ bool HTools::fitPipeTwoGaus(HFrame * fbox, std::string s_out, int x_min, int x_m
     h1->Draw();
 
     if(negative){
-      tfs1 -> SetParLimits(0, -100., -0.00001); // p0 < 0. negative temperature.
+      tfs1 -> SetParLimits(0, -100., -0.00001); // amplitude
       tfs2 -> SetParLimits(0, -100., -0.00001);
       tfs1 -> SetParLimits(2, 0.1, 100.); // sigma
       tfs2 -> SetParLimits(2, 0.1, 100.);
-      // peak position
-      //tfs1 -> SetParLimits(1, y_range / 4., y_range * 3. / 4.);
-      //tfs2 -> SetParLimits(1, nbiny - y_range * 3. / 4., nbiny - y_range / 4.);
     }
     else{
-      tfs1 -> SetParLimits(0, 0.00001, 100.); // p0 < 0. negative temperature.
+      tfs1 -> SetParLimits(0, 0.00001, 100.); // amplitude
       tfs2 -> SetParLimits(0, 0.00001, 100.);
       tfs1 -> SetParLimits(2, 0.1, 100.); // sigma
       tfs2 -> SetParLimits(2, 0.1, 100.);
@@ -106,8 +96,6 @@ bool HTools::fitPipeTwoGaus(HFrame * fbox, std::string s_out, int x_min, int x_m
     h1->Fit(tfs2,"R+");
     tfs1->GetParameters(&pars[0]);
     tfs2->GetParameters(&pars[3]);
-
-    // improve the picture:
     tfs1->SetLineWidth(2);
     tfs2->SetLineWidth(2);
     tfs1->SetLineColor(kBlue);
@@ -130,8 +118,7 @@ bool HTools::fitPipeTwoGaus(HFrame * fbox, std::string s_out, int x_min, int x_m
     y_txt = 0.3*h1->GetMinimum() + 0.7*h1->GetMaximum();
     Tl.DrawLatex(x_txt, y_txt , ss.c_str());
       
-    // fit results
-    // check the definition of the TH1 to decide which bin to set
+    // fetch fit results
     h_temp_bot -> SetBinContent(ix - x_min+1, pars[0]);
     h_posi_bot -> SetBinContent(ix - x_min+1, pars[1]);
     h_sigm_bot -> SetBinContent(ix - x_min+1, pars[2]);
@@ -188,10 +175,7 @@ TH1F* HTools::averagePipe(HFrame * fbox, std::string s_out, int x_min, int x_max
     }
 
     h0->SetBinContent(ix - x_min + 1, avg);
-    //delete h1;
   }
-  //std::string sfilename = "b1_fit.root";
-  //fbox->writeToRootFile(sfilename);
   fbox -> recordLine(h0);
 
   gStyle->SetOptStat(0);
@@ -232,6 +216,5 @@ HFrame* HTools::averageFrames(std::vector<HFrame *> fboxes, std::string shout){
   }
   HFrame * fboxout = new HFrame();
   fboxout -> setFrame(h2);
-  std::cout<<" average "<<h2<<" frame "<<fboxout<<" getframe "<<fboxout->getFrame()<<std::endl;
   return fboxout;
 }

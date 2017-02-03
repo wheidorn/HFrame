@@ -11,15 +11,11 @@ SRCEXT=cpp
 SOURCES=$(shell find $(SRCDIR) -type f -name *.$(SRCEXT))
 OBJECTS=$(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.o))
 CFLAGS=-g $(SPECIALFLAGS) $(ROOTCFLAGS) # -Wall
-#-pthread -lmongoclient  -lboost_thread-mt -lboost_filesystem-mt -lboost_system-mt
 LIB=-L lib $(ROOTLIBS)
 INC=-I include
 
-#set noet in vim to type tab to avoid expandtab
-
 $(TARGET): $(OBJECTS)
 	$(CC) $^ -c -o $(TARGET) $(LIB); $(CC) $^ -c -o $(TARGET) $(LIB)
-#$(CC) $^ -o $(TARGET) $(LIB); $(CC) $^ -o $(TARGET) $(LIB)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.$(SRCEXT)
 	@mkdir -p $(BUILDDIR)
@@ -27,13 +23,5 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%.$(SRCEXT)
 
 clean:
 	$(RM) -r $(BUILDDIR) $(TARGET); $(RM) -r $(BUILDDIR) $(TARGET)
-
-## Tests
-#tester:
-#  $(CC) $(CFLAGS) test/tester.cpp $(INC) $(LIB) -o bin/tester
-#
-## Spikes
-#ticket:
-#  $(CC) $(CFLAGS) spikes/ticket.cpp $(INC) $(LIB) -o bin/ticket
 
 .PHONY: clean
