@@ -1,9 +1,14 @@
 # HFrame
-> mkdir -p lib bin build
->
+> compiling:
+
 > gmake
 
+
+> Then have a test:
+
 > cd test
+
 > gmake
+
 > ./dana
 
