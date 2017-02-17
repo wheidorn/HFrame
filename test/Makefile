@@ -1,6 +1,6 @@
 CPP=g++
 LD=g++
-SPECIALFLAGS=-O3 -std=c++11 -stdlib=libc++
+SPECIALFLAGS=-O3 -std=c++11 
 #SPECIALFLAGS=-g -O0
 ROOTCFLAGS=$(shell root-config --cflags)
 ROOTLIBS=$(shell root-config --libs)

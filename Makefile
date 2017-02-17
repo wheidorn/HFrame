@@ -1,5 +1,5 @@
 CC=g++ # This is the main compiler
-SPECIALFLAGS=-O3 -std=c++11 -stdlib=libc++
+SPECIALFLAGS=-O3 -std=c++11 
 ROOTCFLAGS=$(shell root-config --cflags)
 ROOTLIBS=$(shell root-config --libs)
 
