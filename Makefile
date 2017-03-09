@@ -10,12 +10,12 @@ TARGET=bin/dana
 SRCEXT=cpp
 SOURCES=$(shell find $(SRCDIR) -type f -name *.$(SRCEXT))
 OBJECTS=$(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.o))
-CFLAGS=-g $(SPECIALFLAGS) $(ROOTCFLAGS) # -Wall
+CFLAGS=-g $(SPECIALFLAGS) $(ROOTCFLAGS) # -Wall 
 LIB=-L lib $(ROOTLIBS)
 INC=-I include
 
 $(TARGET): $(OBJECTS)
-	$(CC) $^ -c -o $(TARGET) $(LIB); $(CC) $^ -c -o $(TARGET) $(LIB)
+#	$(CC) $^ -c -o $(TARGET) $(LIB); $(CC) $^ -c -o $(TARGET) $(LIB)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.$(SRCEXT)
 	@mkdir -p $(BUILDDIR)
