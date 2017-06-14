@@ -2,7 +2,6 @@
 
 > for details of the functions, check the include/H~.h files
 
-
 > 1) login to lxplus
 > source setup_lxplus.sh
 
@@ -15,3 +14,4 @@
 >  gmake;
 >  ./dana;
 
+> 4) check examples/ for starting running jobs.
