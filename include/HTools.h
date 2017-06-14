@@ -14,11 +14,12 @@
 #include "TFile.h"
 #include "TMath.h"
 
-#include "HFrame.h"
-
 class HTools{
 
   private:
+    // providing 2D histogram
+    // get 1D in x=ibin, Y=1 to NYBins if isY = true
+    TH1F* getHist1D(TH2F* h2, int ibin, bool isY = true);
 
   public:
     HTools(){}
@@ -29,16 +30,8 @@ class HTools{
     // get TH1F for [1, nybins]
     // fit two gaus [y1-rangefity, y1+rangefity] and [y2-rangefity, y2+rangefity] 
     // store the information of the fitted results
-    //
-    // if T is negative, instead of peak, we are looking for dips, so need to first covert data into positive!!!
-    //bool fitPipeTwoGaus(HFrame * fbox, std::string s_out, int x_min, int x_max, int y1, int y2, int range_fity, bool negative);
+    bool fitFramePipesGaus(TH2F* hframe, std::string s_out, float Tliquid, std::string s_side = "L", std::string sfile = "a1_pipes.root");
+    bool getPeaks(TH1F* hp, std::string s_out, bool negative, double sigma = 2., double threshold=0.15, int niters=15); //20
 
-    bool findFramePipes(HFrame * fbox, std::string s_out, int method_id = 0);
-    //bool fitPipeTwoGaus(HFrame * fbox, std::string s_out, int x_min, int x_max, int y_min, int y_max, bool negative, bool convert_to_cm = true);
-    //bool getPipeSmooth(HFrame * fbox, std::string s_out, int x_min, int x_max, int y_min, int y_max, bool negative, bool convert_to_cm = true);
-
-      // calculate the average T over range [y1, y2], return the TH1F across x range.
-    //TH1F* averagePipe(HFrame * fbox, std::string s_out, int x_min, int x_max, int y1, int y2, bool negative, bool convert_to_cm = true);
-    HFrame* averageFrames(std::vector<HFrame *> fboxes, std::string shout = "T_average");
 };
 #endif

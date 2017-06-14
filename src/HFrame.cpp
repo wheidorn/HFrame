@@ -3,391 +3,265 @@
 #include "TLatex.h"
 #include "TLegend.h"
 #include "TTree.h"
+#include "TFile.h"
 #include <math.h>       /* std::abs */
 
 
-HFrame::HFrame(std::string sfile, std::string sname, bool convert_to_cm){
-  crop_point1 = std::make_pair(-1, -1);
-  crop_point2 = std::make_pair(-1, -1);
-  pipe_point1 = std::make_pair(-1, -1);
-  pipe_point2 = std::make_pair(-1, -1);
-
-  conversionToCM = convert_to_cm;
-  cmperpix = CMPERPIXELPRE;
-  lens = 80;
-  if(sfile.find("sJ") != std::string::npos || sfile.find("_J") != std::string::npos){
-    side_L = false;
-  }else if(sfile.find("sL") != std::string::npos || sfile.find("_L") != std::string::npos){
-    side_L = true;
-  }else{
-    std::cout<<"WARNING: Frame side information not available in file name: "<<sfile<<". Looking for sJ or _J or sL or _L. Set to side L."<<std::endl;
-    std::cout<<"Use function p_to_frame -> setSideL( ... ) to modify it."<<std::endl;
-    side_L = true;
-  }
-
+using namespace std;
+bool HFrame::read(std::string sfile, std::string sname){
   TFile * fs = new TFile( sfile.c_str(), "read");
-  if (!fs) return;
+  if (!fs) return false;
 
-  if(convert_to_cm){
-    TH2F* htmp = (TH2F*) fs -> Get(sname.c_str());
+  TH2F* h_frame = (TH2F*) fs -> Get(sname.c_str());
+  if(!h_frame) return false;
+  int nbinx = h_frame -> GetNbinsX();
+  int nbiny = h_frame -> GetNbinsY();
+  if(nbinx > m_NXPixel || nbiny > m_NYPixel){
+    cout<<"too many bins in input histogram: X "<<nbinx<<" > "<<m_NXPixel<<" ? or Y "<<nbiny<<" > "<<m_NYPixel<<endl;
+    nbinx = m_NXPixel;
+    nbiny = m_NYPixel;
+  }
 
-    std::string title = std::string("pixels to cm: ") + Form("%.2f",cmperpix) + " cm/pix";
-    int nbinx = htmp -> GetNbinsX(), nbiny = htmp->GetNbinsY();
-    h_frame = new TH2F((sname).c_str(), title.c_str(), nbinx, 0., nbinx*cmperpix, nbiny, 0., nbiny*cmperpix);
-    h_frame -> GetXaxis()->SetTitle("X direction (cm)");
-    h_frame -> GetYaxis()->SetTitle("Y direction (cm)");
-    for (int ix=1; ix<nbinx; ix++){
-      for (int iy=1; iy<nbiny; iy++){
-        h_frame -> SetBinContent(ix, iy, htmp->GetBinContent(ix, iy));
-        h_frame -> SetBinError(ix, iy, htmp->GetBinError(ix, iy));
-      }
+  for (int ix=0; ix<nbinx; ix++){
+    for (int iy=0; iy<nbiny; iy++){
+      m_data[ix][iy] = h_frame -> GetBinContent(ix+1, iy+1);
     }
-
-    delete htmp;
   }
-  else{
-    h_frame = (TH2F*) fs -> Get(sname.c_str()) ->Clone((sname).c_str());
-    h_frame -> GetXaxis()->SetTitle("X pixels");
-    h_frame -> GetYaxis()->SetTitle("Y pixels");
-  }
-  if (!h_frame) return;
-
-  // if h_fpipe exist, then, get that as well
-  // no need to convert to cm for it since it should have
-  // been converted to cm in the previous step
-  fs -> cd();
-  std::string snamepipe = sname+"_framepipe";
-  TH2F* hptmp = (TH2F*) fs -> Get(snamepipe.c_str());
-  if(hptmp){
-    h_fpipe = (TH2F*) hptmp -> Clone();
-    h_fpipe -> SetDirectory(NULL);
-    delete hptmp;
-    std::cout<<"INFO: got frame pipe at "<<h_fpipe<<std::endl;
-  }else{
-    std::cout<<"INFO: frame pipe NOT found. using name: "<< sname<<"_framepipe."<<std::endl;
-  }
-
-
-  T_liquid = this-> guessTLiquid();
-  NXPIX = h_frame -> GetNbinsX();
-  NYPIX = h_frame -> GetNbinsY();
-  h_frame -> SetDirectory(NULL);
-
-  TTree *t0 = (TTree *) fs->Get("info");
-  if(t0){
-    t0 -> SetBranchAddress("T_liquid", &T_liquid);
-    t0 -> SetBranchAddress("conversionToCM", &conversionToCM);
-    t0 -> SetBranchAddress("NXPIX", &NXPIX);
-    t0 -> SetBranchAddress("NYPIX", &NYPIX);
-    t0 -> SetBranchAddress("side_L", &side_L);
-    t0 -> SetBranchAddress("cmperpix", &cmperpix);
-    t0 -> SetBranchAddress("lens", &lens);
-    t0 -> SetBranchAddress("crop_point1_x", &(crop_point1.first) );
-    t0 -> SetBranchAddress("crop_point1_y", &(crop_point1.second));
-    t0 -> SetBranchAddress("pipe_point1_x", &(pipe_point1.first) );
-    t0 -> SetBranchAddress("pipe_point1_y", &(pipe_point1.second));
-    t0 -> GetEntry(0);
-    delete t0;
-  }
-  fs -> Close();
-  delete fs;
+  return true;
 }
 
-HFrame::HFrame(std::vector<std::string> sfiles, int n_xpixels, int n_ypixels, std::string shout, std::string stree, std::string stemp, std::string sxbrh, std::string sybrh, bool convert_to_cm){
-  crop_point1 = std::make_pair(-1, -1);
-  crop_point2 = std::make_pair(-1, -1);
-  pipe_point1 = std::make_pair(-1, -1);
-  pipe_point2 = std::make_pair(-1, -1);
-
-  conversionToCM = convert_to_cm;
-  cmperpix = CMPERPIXELPRE;
-  lens = 80;
-  T_liquid = -999.;
-  NXPIX = n_xpixels;
-  NYPIX = n_ypixels;
-  if (!h_frame){
-    if(convert_to_cm) h_frame = new TH2F( shout.c_str(), "", NXPIX, 0., cmperpix * NXPIX, NYPIX, 0., cmperpix * NYPIX);
-    else              h_frame = new TH2F( shout.c_str(), "", NXPIX, 0., NXPIX, NYPIX, 0., NYPIX);
-  }
-  h_frame -> SetDirectory(NULL);
-
+bool HFrame::read(std::vector<std::string> sfiles, std::string stree, std::string stemp, std::string sxbrh, std::string sybrh){
   int nfile = sfiles.size();
+
   if (nfile<=0){
     std::cout<<"ERROR: number of files "<<nfile<<std::endl;
-    return;
+    return false;
   }
 
   float scl = 1. / nfile;
   for (int jf =0; jf<nfile; jf++){
-
     std::cout<<jf<<"\r"; std::cout.flush();
-
     std::string sfile = sfiles.at(jf);
-    TFile * f1 = new TFile( sfile.c_str(), "read");
-    if (!f1){
-      std::cout<<"ERROR: file "<<sfile<<" NOT found!!!"<<std::endl;
-      return;
-    }
+    bool status = this -> read( sfile, stree, stemp, sxbrh, sybrh, scl);
 
-    TTree * t1 = (TTree*)f1->Get(stree.c_str());
-    if(!t1){ delete f1; return; }
-
-    int xpos, ypos;
-    float temperature;
-    t1->SetBranchAddress(sxbrh.c_str(), &xpos);
-    t1->SetBranchAddress(sybrh.c_str(), &ypos);
-    t1->SetBranchAddress(stemp.c_str(), &temperature);
-
-    long int nentry = t1->GetEntries();
-    if (nentry <=0) return;
-
-    int xmax_tree = 0, ymax_tree = 0;
-    for (int je=0;je<nentry;je++){
-      t1->GetEntry(je);
-
-      // in tree file, position starting from 0, why ???????
-      xpos += 1;
-      ypos += 1;
-
-      if(jf==0){
-        h_frame -> SetBinContent(xpos, ypos, temperature * scl);
-        h_frame -> SetBinError(xpos, ypos, 0.1);
-      }else{
-        float tmp = temperature * scl + h_frame -> GetBinContent(xpos, ypos);
-        h_frame -> SetBinContent(xpos, ypos, tmp);
-      }
-
-      if (xmax_tree < xpos) xmax_tree = xpos;
-      if (ymax_tree < ypos) ymax_tree = ypos;
-
-    }
-    delete t1;
-    f1->Close();
-    delete f1;
-    if(xmax_tree !=NXPIX || ymax_tree !=NYPIX) std::cout<<sfile<<": found frame, xmax "<<xmax_tree<<", ymax "<<ymax_tree<<std::endl;
+    // if found one failed reading, return false;
+    if (!status) return false;
   }
 
-  T_liquid = this-> guessTLiquid();
+  return true;
+}
+
+bool HFrame::read(string sfile, std::string stree, std::string stemp, std::string sxbrh, std::string sybrh, float scale){
+
+  TFile * f1 = new TFile( sfile.c_str(), "read");
+  if (!f1){
+    std::cout<<"ERROR: file "<<sfile<<" NOT found!!!"<<std::endl;
+    return false;
+  }
+
+  TTree * t1 = (TTree*)f1->Get(stree.c_str());
+  if(!t1){ delete f1; return false; }
+
+  int xpos, ypos;
+  float temperature;
+  t1->SetBranchAddress(sxbrh.c_str(), &xpos);
+  t1->SetBranchAddress(sybrh.c_str(), &ypos);
+  t1->SetBranchAddress(stemp.c_str(), &temperature);
+
+  long int nentry = t1->GetEntries();
+  if (nentry <=0) return false;
+  int xmax_tree = 0, ymax_tree = 0;
+  for (int je=0;je<nentry;je++){
+    t1->GetEntry(je);
+
+    // in tree file, position starting from 0, need to +1 if filling a Histogram!!!
+    if(xpos >= m_NXPixel || ypos >= m_NYPixel){
+      cout<<" over flow X "<<xpos << " >= "<< m_NXPixel<<" ? or Y "<<ypos <<" >= " << m_NYPixel<<" skip!!! "<<endl;
+      continue;
+    }
+
+    // update m_data
+    m_data[xpos][ypos] += temperature * scale;
+  }
+
+  if(t1) delete t1;
+  f1->Close();
+  if(f1) delete f1;
+  return true;
 }
 
 
 bool HFrame::writeToRootFile(std::string sfile){
-  if( !h_frame ) return false;
+
+  if( sfile == "" ) return false;
+  
   TFile * f0 = new TFile( sfile.c_str(), "recreate");
   if (!f0) return false;
+  TH2F* h_hist = new TH2F(m_name_hist.c_str(), "", m_NXPixel, 0., m_NXPixel * m_CMperPixel, m_NYPixel, 0., m_NYPixel * m_CMperPixel);
 
-  if(h_frame){
-    TH2F* h1 = (TH2F*) h_frame->Clone(); // h_frame -> GetName() 
-    h1 ->SetDirectory(f0); 
-    h1->Write();
-    delete h1;
-  }
+  int NXPixel_crop = m_crop_x2 - m_crop_x1 + 1, NYPixel_crop = m_crop_y2 - m_crop_y1 + 1;
+  TH2F* h_crop = new TH2F(m_name_crop.c_str(), "", NXPixel_crop, 0., NXPixel_crop * m_CMperPixel, NYPixel_crop, 0., NYPixel_crop * m_CMperPixel);
 
-  if(h_fpipe){
-    TH2F* h2 = (TH2F*) h_fpipe->Clone(); 
-    h2 ->SetDirectory(f0); 
-    h2->Write();
-    delete h2;
+  // pipe frame is a sub-figure of the cropped frame
+  int NXPixel_pipe = m_pipe_x2 - m_pipe_x1 + 1, NYPixel_pipe = m_pipe_y2 - m_pipe_y1 + 1;
+  float pipe_xmin = (m_pipe_x1 - m_crop_x1) * m_CMperPixel;
+  float pipe_xmax = NXPixel_pipe * m_CMperPixel + pipe_xmin;
+  float pipe_ymin = (m_pipe_y1 - m_crop_y1) * m_CMperPixel;
+  float pipe_ymax = NYPixel_pipe * m_CMperPixel + pipe_ymin;
+  TH2F* h_pipe = new TH2F(m_name_pipe.c_str(), "", NXPixel_pipe, pipe_xmin, pipe_xmax, NYPixel_pipe, pipe_ymin, pipe_ymax);
+
+
+  // add 0.5% error, since otherwise the fit of pipe peak wouldn't work.
+  const float rel_error = 0.005; 
+  for (int ix=0; ix< m_NXPixel; ix++){
+    for (int iy=0; iy< m_NYPixel; iy++){
+      h_hist -> SetBinContent(ix+1, iy+1, m_data[ix][iy]);
+      h_hist -> SetBinError(ix+1, iy+1, m_data[ix][iy] * rel_error);
+
+      int ix_crop = ix - m_crop_x1, iy_crop = iy - m_crop_y1;
+      if(ix_crop >=0 && iy_crop >=0 && ix_crop<NXPixel_crop && iy_crop < NYPixel_crop){
+        h_crop -> SetBinContent(ix_crop+1, iy_crop+1, m_data[ix][iy]);
+        h_crop -> SetBinError(ix_crop+1, iy_crop+1, m_data[ix][iy] * rel_error);
+      }
+
+      int ix_pipe = ix - m_pipe_x1, iy_pipe = iy - m_pipe_y1;
+      if(ix_pipe >=0 && iy_pipe >=0 && ix_pipe<NXPixel_pipe && iy_pipe < NYPixel_pipe){
+        h_pipe -> SetBinContent(ix_pipe+1, iy_pipe+1, m_data[ix][iy]);
+        h_pipe -> SetBinError(ix_pipe+1, iy_pipe+1, m_data[ix][iy] * rel_error);
+      }
+    }
   }
-  for (auto pone : m_pipemap){
-    TH1F * h1 = (TH1F*) pone.second -> Clone();
-    h1 ->SetDirectory(f0); 
-    h1 -> Write();
-    delete h1;
-  }
-  // write out basic information only when T_liquid is set!
-  // otherwise, consider the basic information is not provided.
-  if(T_liquid > -998.){
-    TTree *t0 = new TTree("info","information about the frame");
-    t0 -> Branch("T_liquid", &T_liquid);
-    t0 -> Branch("conversionToCM", &conversionToCM);
-    t0 -> Branch("NXPIX", &NXPIX);
-    t0 -> Branch("NYPIX", &NYPIX);
-    t0 -> Branch("side_L", &side_L, "side_L/O");
-    t0 -> Branch("cmperpix", &cmperpix);
-    t0 -> Branch("lens", &lens);
-    t0 -> Branch("crop_point1_x", &(crop_point1.first) );
-    t0 -> Branch("crop_point1_y", &(crop_point1.second));
-    t0 -> Branch("pipe_point1_x", &(pipe_point1.first) );
-    t0 -> Branch("pipe_point1_y", &(pipe_point1.second));
-    t0 -> Fill(); // fill the current values, once!
-    t0-> Write();
-    delete t0;
-  }
+  h_hist ->Write();
+  h_crop ->Write();
+  h_pipe ->Write();
+
+  TTree *t0 = new TTree("info","information about the frame");
+  int NXPixel = m_NXPixel;
+  int NYPixel = m_NYPixel;
+  float CMperPixel = m_CMperPixel;
+  t0 -> Branch("NXPixel", &NXPixel);
+  t0 -> Branch("NYPixel", &NYPixel);
+  t0 -> Branch("CMperPixel", &CMperPixel);
+
+  t0 -> Branch("T_liquid", &m_T_liquid);
+  t0 -> Branch("side", &m_side, "m_side/B");
+  t0 -> Branch("lens", &m_lens);
+  t0 -> Branch("crop_x1", &m_crop_x1);
+  t0 -> Branch("crop_y1", &m_crop_y1);
+  t0 -> Branch("crop_x2", &m_crop_x2);
+  t0 -> Branch("crop_y2", &m_crop_y2);
+  t0 -> Branch("pipe_x1", &m_pipe_x1);
+  t0 -> Branch("pipe_y1", &m_pipe_y1);
+  t0 -> Branch("pipe_x2", &m_pipe_x2);
+  t0 -> Branch("pipe_y2", &m_pipe_y2);
+  t0 -> Fill(); // fill the current values, once!
+  t0-> Write();
+  if(t0) delete t0;
   f0->Close();
-  delete f0;
+  if(f0) delete f0;
   return true;
+}
+    
+void HFrame::print(string sout){
+
+  FILE* fout=fopen( sout.c_str(), "w");
+
+  fprintf(fout, "lens:                   %3d \n",   m_lens);
+  fprintf(fout, "side:                   %c \n",    m_side);
+  fprintf(fout, "cm per pixel:           %5.3f \n", m_CMperPixel);
+  fprintf(fout, "Temperature liquid (C): %4.1f \n", m_T_liquid);
+  fprintf(fout, "Number of pixels X:     %4d \n",   m_NXPixel);
+  fprintf(fout, "Number of pixels Y:     %4d \n",   m_NYPixel);
+  fprintf(fout, "crop (x1,y1,x2,y2):     %3d,%3d,%3d,%3d \n", m_crop_x1, m_crop_y1, m_crop_x2, m_crop_y2);
+  fprintf(fout, "pipe (x1,y1,x2,y2):     %3d,%3d,%3d,%3d \n", m_pipe_x1, m_pipe_y1, m_pipe_x2, m_pipe_y2);
+  fclose(fout);
+  //if(fout) delete fout;
 }
 
 bool HFrame::rotate(HFrame::angle ang_clock){
 
-  if (!h_frame) return false;
   if (ang_clock != C090 && ang_clock != C180 && ang_clock != C270) return false;
 
-  TH2F* h_tmp = (TH2F*) h_frame->Clone("h_tmp");
-  int nbinx = h_tmp->GetNbinsX();
-  int nbiny = h_tmp->GetNbinsY();
+  vector<vector<float>> tmpdata = m_data;
 
-  for (int ix=1; ix<=nbinx; ix++){
-    for (int iy=1; iy<=nbiny; iy++){
+  for (int ix=0; ix< m_NXPixel; ix++){
+    for (int iy=0; iy< m_NYPixel; iy++){
 
-      int tmp_ix = iy, tmp_iy = nbinx - ix + 1; // C090
-      if     (ang_clock == C180){tmp_ix = nbinx - ix + 1; tmp_iy = nbiny - iy + 1;}
-      else if(ang_clock == C270){tmp_ix = nbiny - iy + 1; tmp_iy = ix;}
+      int to_ix = iy, to_iy = m_NXPixel - ix - 1; // C090
+      if     (ang_clock == C180){to_ix = m_NXPixel - ix - 1; to_iy = m_NYPixel - iy - 1;}
+      else if(ang_clock == C270){to_ix = m_NYPixel - iy - 1; to_iy = ix;}
 
-      float temperature = h_tmp->GetBinContent(ix, iy);
-      float temp_error  = h_tmp->GetBinError(ix, iy);
-      h_frame -> SetBinContent(tmp_ix, tmp_iy, temperature);
-      h_frame -> SetBinError(tmp_ix, tmp_iy, temp_error);
+      m_data[to_ix][to_iy] = tmpdata[ix][iy];
+
     }
   }
-  delete h_tmp;
+  tmpdata.clear();
   return true;
+}
+
+float HFrame::average(int x1, int y1, int x2, int y2){
+  float Tavg = -999.;
+  if(m_data.size() ==0){
+    cout<<"WARNING: frame is empty now! No average found!"<<endl;
+    return Tavg;
+  }
+  int ix1 = x1, iy1 = y1, ix2 = x2, iy2 = y2;
+  if(x1 < 0 || x1 >= m_NXPixel) ix1  = 0;
+  if(x2 < 0 || x2 >= m_NXPixel) ix2  = m_NXPixel - 1;
+  if(y1 < 0 || y1 >= m_NYPixel) iy1  = 0;
+  if(y2 < 0 || y2 >= m_NYPixel) iy2  = m_NYPixel - 1;
+  if(ix1 > ix2){
+    cout<<"WARNING: x1 "<<ix1<<" > x2 "<<x2<<" swap!"<<endl;
+    int itmp = ix1; ix1 = ix2; ix2 = itmp;
+  } 
+  if(iy1 > iy2){
+    cout<<"WARNING: y1 "<<iy1<<" > y2 "<<iy2<<" swap!"<<endl;
+    int itmp = iy1; iy1 = iy2; iy2 = itmp;
+  } 
+
+
+  Tavg = 0.; 
+  int NPixelAllAvg = (x2 - x1 + 1) * (y2 - y1 + 1);
+  for (int jx=ix1; jx<=ix2; jx++){
+    for (int jy=iy1; jy<=iy2; jy++){
+      Tavg += m_data[jx][jy] / NPixelAllAvg;
+    }
+  }
+  return Tavg;
 }
 
 bool HFrame::mirror( bool byX){
 
-  if (!h_frame) return false;
+  vector<vector<float>> tmpdata = m_data;
+  for (int ix=0; ix< m_NXPixel; ix++){
+    for (int iy=0; iy< m_NYPixel; iy++){
 
-  TH2F* h_tmp = (TH2F*) h_frame->Clone("h_tmp");
-  int nbinx = h_tmp->GetNbinsX();
-  int nbiny = h_tmp->GetNbinsY();
+      // by X, change Y
+      int to_ix = ix, to_iy = m_NYPixel - iy - 1;
+      if(!byX){ to_ix = m_NXPixel - ix - 1; to_iy = iy; }
 
-
-  for (int ix=1; ix<=nbinx; ix++){
-    for (int iy=1; iy<=nbiny; iy++){
-
-      unsigned int tmp_ix = ix, tmp_iy = nbiny - iy + 1; // by X, change Y
-      if(!byX){ tmp_ix = nbinx - ix + 1; tmp_iy = iy; }
-
-      float temperature = h_tmp->GetBinContent(ix, iy);
-      float temp_error  = h_tmp->GetBinError(ix, iy);
-      h_frame -> SetBinContent(tmp_ix, tmp_iy, temperature);
-      h_frame -> SetBinError(tmp_ix, tmp_iy, temp_error);
-
+      m_data[to_ix][to_iy] = tmpdata[ix][iy];
     }
   }
-  delete h_tmp;
   return true;
 }
 
 
-TH1F* HFrame::getLine(int x1, int y1, int x2, int y2, bool is_fpipe){
-  if ( (!is_fpipe && !h_frame) || (is_fpipe && !h_fpipe) ) return NULL;
-  TH2F * h_tmp = NULL;
-  if (is_fpipe) h_tmp = h_fpipe;
-  else          h_tmp = h_frame;
+bool HFrame::findCropPositions( float xsize_cm, float ysize_cm){
+  int xpix = static_cast<int>(xsize_cm / m_CMperPixel);
+  int ypix = static_cast<int>(ysize_cm / m_CMperPixel);
+  if (m_data.size() == 0 || xpix <=1 || ypix <= 1) return false;
+  int NPixCrop = xpix * ypix;
 
-  bool Xdir = true;
-  int nbin = std::abs(x1 - x2) + 1;
-  if( nbin < std::abs(y1 - y2) + 1){
-    nbin = std::abs(y1 - y2) + 1;
-    Xdir = false;
-  }
-  if(nbin<=1) return NULL;
-
-  std::string sname = "frame1D_";//std::string(h_frame->GetName());
-  sname += Form("x%dy%d_x%dy%d",x1,y1,x2,y2);
-  TH1F* h1 = new TH1F(sname.c_str(),"",nbin,0.,float(nbin));
-  for (int ib = 1; ib <= nbin; ib++){
-    int tmp_ix = x1 - 1 + ib * (x1 < x2 ? 1 : -1);
-    int tmp_iy = y1     + int( float(y2 - y1) * float(ib - 1) / std::abs(x2 - x1) );
-    if(!Xdir){
-      tmp_ix = x1     + int( float(x2 - x1) * float(ib - 1) / std::abs(y2 - y1) );
-      tmp_iy = y1 - 1 + ib * (y1 < y2 ? 1 : -1);
-    }
-    float temperature = h_tmp->GetBinContent(tmp_ix, tmp_iy);
-    float temp_error  = h_tmp->GetBinError(tmp_ix, tmp_iy);
-    // if no error, fitting 1 D histogram wouldn't work.
-    if (temp_error <=0.) temp_error = 0.1;
-    h1 -> SetBinContent(ib, temperature);
-    h1 -> SetBinError(ib, temp_error);
-  }
-  h_tmp = NULL;
-  return h1;
-}
-
-bool HFrame::crop( int x1, int y1, int x4, int y4, bool to_fpipe){
-  if (!h_frame) return false;
-  int nbinx = x4 - x1 + 1;
-  int nbiny = y4 - y1 + 1;
-  if (nbinx <= 1 || nbiny <= 1) return false;
-
-  if(crop_point1.first <=0){
-    if(to_fpipe){
-      pipe_point1 = std::make_pair(x1, y1); 
-      pipe_point2 = std::make_pair(x4, y4); 
-    }else{
-      crop_point1 = std::make_pair(x1, y1); 
-      crop_point2 = std::make_pair(x4, y4); 
-    }
-  }
-  return this->crop(x1, y1, x4,y1, x1,y4, to_fpipe);
-
-}
-
-bool HFrame::crop( int x1, int y1, int x2, int y2, int x3, int y3, bool to_fpipe){
-
-  if (!h_frame) return false;
-  int nbinx = x2 - x1 + 1;
-  int nbiny = y3 - y1 + 1;
-  if (nbinx <= 1 || nbiny <= 1) return false;
-
-  TH2F* h_tmp = (TH2F*) h_frame->Clone("h_tmp");
-  std::string sname = static_cast<std::string>(h_frame -> GetName());
-  float xmax = float(nbinx), ymax = float(nbiny);
-  if(conversionToCM){
-    xmax = cmperpix * nbinx;
-    ymax = cmperpix * nbiny;
-  }
-
-  if(to_fpipe) sname += "_framepipe";
-  TH2F * h_tmp2 = new TH2F(sname.c_str(), "", nbinx, 0., xmax, nbiny, 0., ymax);
-  h_tmp2 -> GetXaxis() -> SetTitle( h_tmp -> GetXaxis() -> GetTitle() );
-  h_tmp2 -> GetYaxis() -> SetTitle( h_tmp -> GetYaxis() -> GetTitle() );
-  //  std::cout<<"in crop, x title "<<h_tmp -> GetXaxis() -> GetTitle()<<std::endl;
-
-  for (int ix=1; ix<=nbinx; ix++){
-    for (int iy=1; iy<=nbiny; iy++){
-
-      int tmp_ix = x1 - 1 + ix +  int( float(x3 - x1) * float(iy - 1) / (y3 - y1) );
-      int tmp_iy = y1 - 1 + iy +  int( float(y2 - y1) * float(ix - 1) / (x2 - x1) );
-      float temperature = h_tmp->GetBinContent(tmp_ix, tmp_iy);
-      float temp_error  = h_tmp->GetBinError(tmp_ix, tmp_iy);
-
-      h_tmp2 -> SetBinContent(ix, iy, temperature);
-      h_tmp2 -> SetBinError(ix, iy, temp_error);
-    }
-  }
-  if(to_fpipe){
-    h_fpipe = h_tmp2;
-  }else{
-    if(h_frame) delete h_frame;
-    h_frame = h_tmp2;
-  }
-
-  delete h_tmp;
-  return true;
-
-}
-
-bool HFrame::cropRawToStave( float xsize_cm, float ysize_cm){
-  int xpix = static_cast<int>(xsize_cm / cmperpix), ypix = static_cast<int>(ysize_cm / cmperpix);
-  if (!h_frame || xpix <=1 || ypix <= 1) return false;
-
-  const float Tambient = 20.;
-  double Tmin = h_frame -> GetMinimum();
-  double Tmax = h_frame -> GetMaximum();
   bool is_negative = this->isNegative();
 
   int ix1 = -1, iy1 = -1;
-  double Tmm = -999.;
-  if(is_negative) Tmm = 999.;
-  for (int ix=1; ix<=NXPIX-xpix; ix++){
-    for (int iy=1; iy<=NYPIX-ypix; iy++){
+  float Tmm = -999.;
+  if(is_negative) Tmm = 999;
+  for (int ix=0; ix<m_NXPixel-xpix; ix++){
+    for (int iy=0; iy<m_NYPixel-ypix; iy++){
 
-      double Tavg = h_frame -> Integral(ix, ix+xpix-1, iy, iy+ypix-1);
-      Tavg /= (xpix * ypix);
+      float Tavg = this -> average(ix, iy, ix+xpix-1, ypix - 1 + iy);
       if ((is_negative && Tavg < Tmm ) || (!is_negative && Tavg > Tmm) ){
         Tmm = Tavg;
         ix1 = ix;
@@ -395,66 +269,62 @@ bool HFrame::cropRawToStave( float xsize_cm, float ysize_cm){
       }
     }
   }
-  std::cout<<"crop auto, before end-of-stave: p1 "<<ix1<<" "<< iy1<<" p2 "<<  ix1+xpix-1<<" "<< iy1<<" p3 "<<  ix1<<" "<< iy1+ypix-1<<std::endl;
+
   // include the end of stave card now. The size of the end of stave card is about
   // 7.5% * xpix and 35% * ypix
   int xpix_ec = xpix / 13, ypix_ec = ypix / 3;
-  if (iy1 - ypix_ec + 1 <= 0){
-    std::cout<<"crop_auto failed, found x1 "<<ix1<<" y1 "<<iy1<<" too low in Y"<<std::endl;
-    return false;
-  }else if (iy1 + ypix + ypix_ec - 2 > NYPIX){
-    std::cout<<"crop_auto failed, found x1 "<<ix1<<" y1 "<<iy1<<" too high in Y"<<std::endl;
-    return false;
+  while (iy1 - ypix_ec < 0 || iy1 + ypix + ypix_ec >= m_NYPixel){
+    cout<<"WARNING: not enough place to put End-of-Stave card. reduce size!"<<endl;
+    ypix_ec--;
   }
-  double Tsum_bl = h_frame -> Integral(ix1, ix1+xpix_ec-1, iy1 - ypix_ec + 1, iy1); // bottom left
-  double Tsum_tl = h_frame -> Integral(ix1, ix1+xpix_ec-1, iy1 + ypix - 1, iy1 + ypix + ypix_ec - 2); // top left
-  double Tsum_br = h_frame -> Integral(ix1+xpix-xpix_ec, ix1+xpix-1, iy1 - ypix_ec + 1, iy1); // bottom right
-  double Tsum_tr = h_frame -> Integral(ix1+xpix-xpix_ec, ix1+xpix-1, iy1 + ypix - 1, iy1 + ypix + ypix_ec - 2); // top right
-  if(is_negative){
-    if((Tsum_bl < Tsum_tl && Tsum_bl < Tsum_tr) || (Tsum_br < Tsum_tl && Tsum_br < Tsum_tr)){ iy1 -= ypix_ec; ypix += ypix_ec;}
-    else  ypix += ypix_ec;
-  }else{
-    if((Tsum_bl > Tsum_tl && Tsum_bl > Tsum_tr) || (Tsum_br > Tsum_tl && Tsum_br > Tsum_tr)){ iy1 -= ypix_ec; ypix += ypix_ec;}
-    else  ypix += ypix_ec;
-  }
+  float Tavg_bl = this -> average(ix1, iy1 - ypix_ec, ix1 + xpix_ec - 1, iy1 - 1                 ); // bottom left
+  float Tavg_tl = this -> average(ix1, iy1 + ypix,    ix1 + xpix_ec - 1, iy1 + ypix + ypix_ec - 1); // top left
+  float Tavg_br = this -> average(ix1 + xpix - xpix_ec, iy1 - ypix_ec, ix1 + xpix - 1, iy1 - 1                 ); // bottom right
+  float Tavg_tr = this -> average(ix1 + xpix - xpix_ec, iy1 + ypix,    ix1 + xpix - 1, iy1 + ypix + ypix_ec - 1); // top right
 
-  std::cout<<"crop auto: p1 "<<ix1<<" "<< iy1<<" p2 "<<  ix1+xpix-1<<" "<< iy1<<" p3 "<<  ix1<<" "<< iy1+ypix-1<<std::endl;
+  float Tavg_bmin = Tavg_bl, Tavg_bmax = Tavg_br;
+  if(Tavg_bl > Tavg_br){Tavg_bmin = Tavg_br; Tavg_bmax = Tavg_bl;}
+  float Tavg_tmin = Tavg_tl, Tavg_tmax = Tavg_tr;
+  if(Tavg_tl > Tavg_tr){Tavg_tmin = Tavg_tr; Tavg_tmax = Tavg_tl;}
+
+  if((is_negative && Tavg_bmin < Tavg_tmin) || (!is_negative && Tavg_bmin > Tavg_tmin)) iy1 -= ypix_ec; 
+  ypix += ypix_ec;
 
   // found points one(X1, Y1) and two (X2,Y2)
-  crop_point1.first  = ix1;
-  crop_point1.second = iy1;
-  crop_point2.first  = ix1+xpix-1;
-  crop_point2.second = iy1+ypix-1;
+  m_crop_x1 = ix1;
+  m_crop_y1 = iy1;
+  m_crop_x2 = ix1+xpix-1;
+  m_crop_y2 = iy1+ypix-1;
 
-  bool is_to_pipe = false;
-  return this->crop(ix1, iy1,  ix1+xpix-1, iy1,  ix1, iy1+ypix-1, is_to_pipe);
+  return true;
 }
 
-bool HFrame::cropStaveToPipe( float xsize_cm, float ysize_cm, float yedge_cm){
-
-  int xpix = static_cast<int>(xsize_cm / cmperpix), ypix = static_cast<int>(ysize_cm / cmperpix);
-  int ypix_edge = static_cast<int>(yedge_cm / cmperpix);
-
-  if (!h_frame || xpix <=1 || ypix <= 1) return false;
-  int NXBin = h_frame -> GetNbinsX();
-  int NYBin = h_frame -> GetNbinsY();
-  if(xpix > NXBin || ypix > NYBin) return false;
 
 
-  const float Tambient = 20.;
-  double Tmin = h_frame -> GetMinimum();
-  double Tmax = h_frame -> GetMaximum();
+
+bool HFrame::findPipePositions( float xsize_cm, float ysize_cm, float yedge_cm){
+
+  int xpix = static_cast<int>(xsize_cm / m_CMperPixel), ypix = static_cast<int>(ysize_cm / m_CMperPixel);
+  int ypix_edge = static_cast<int>(yedge_cm / m_CMperPixel);
+
+  if (m_data.size() ==0 || xpix <=1 || ypix <= 1) return false;
+
   bool is_negative = this->isNegative();
 
-  int ix1 = -1, iy1 = -1;
-  double Tmm = -999.;
-  if(is_negative) Tmm = 999.;
-  for (int ix=1; ix<=NXBin-xpix; ix++){
-    for (int iy=1; iy<NYBin-ypix; iy++){
+  int ix_a = 0, iy_a = 0; //starting point
+  int ix_z = m_NXPixel-xpix, iy_z = m_NYPixel-ypix;
+  if(m_crop_x1 >=0) ix_a = m_crop_x1;
+  if(m_crop_y1 >=0) iy_a = m_crop_y1;
+  if(m_crop_x2 >=0) ix_z = m_crop_x2 - xpix;
+  if(m_crop_y2 >=0) iy_z = m_crop_y2 - ypix;
 
-      double Tavg  = h_frame -> Integral(ix, ix+xpix-1, iy, iy);
-      Tavg += h_frame -> Integral(ix, ix+xpix-1, iy+ypix, iy+ypix);
-      Tavg /= (xpix * 2);
+  int ix1 = -1, iy1 = -1;
+  float Tmm = -999.;
+  if(is_negative) Tmm = 999.;
+  for (int ix=ix_a; ix<ix_z; ix++){
+    for (int iy=iy_a; iy<iy_z; iy++){
+
+      float Tavg = this -> average(ix, iy, ix + xpix - 1, iy + ypix - 1);
       if ((is_negative && Tavg < Tmm ) || (!is_negative && Tavg > Tmm) ){
         Tmm = Tavg;
         ix1 = ix;
@@ -462,52 +332,51 @@ bool HFrame::cropStaveToPipe( float xsize_cm, float ysize_cm, float yedge_cm){
       }
     }
   }
+
   iy1 -= ypix_edge;
   ypix += 2 * ypix_edge;
-  if (iy1 < 1 || iy1 + ypix > NYBin ) return false;
+  if (iy1 < 1 || iy1 + ypix > m_NYPixel ) return false;
 
   // found points one(X1, Y1) and two (X2,Y2)
-  pipe_point1.first  = ix1;
-  pipe_point1.second = iy1;
-  pipe_point2.first  = ix1+xpix-1;
-  pipe_point2.second = iy1+ypix-1;
-
-  bool is_to_pipe = true;
-  return this->crop(ix1, iy1,  ix1+xpix-1, iy1,  ix1, iy1+ypix-1, is_to_pipe);
+  m_pipe_x1 = ix1;
+  m_pipe_y1 = iy1;
+  m_pipe_x2 = ix1+xpix-1;
+  m_pipe_y2 = iy1+ypix-1;
+  return true;
 }
 
-float HFrame::guessTLiquid(){
-  float TLguess = -999.;
-  if (!h_frame) return TLguess;
-  // if T_liquid is not updated
-  // use the closest 5 C to the Min/Max temperature.
-  int TempLow = int(h_frame -> GetMinimum());
-  int TempHig = int(h_frame -> GetMaximum());
-  if(TempLow < 10){
-    TempLow = int(TempLow / 10) * 10 - 5 - (TempLow % 10 >= 5 ? 5 : 0);
-    TLguess = float(TempLow);
-  }else if(TempHig>30){
-    TempHig = int(TempHig / 10) * 10 + 5 + (TempHig % 10 >= 5 ? 5 : 0);
-    TLguess = float(TempHig);
-  }else{
-    TLguess = float( (TempLow + TempHig) / 2 );
+void HFrame::setPipePositions(float x1_cm, float y1_cm, float x2_cm, float y2_cm){
+
+  if(x1_cm > x2_cm || y1_cm > y2_cm){
+    std::cout<<"ERROR: setting pipe positions with x1 "<<x1_cm<<" > y2 "<<x2_cm<<" OR y1 "<<y1_cm<<" > y2 "<<y2_cm<<std::endl;
+    return;
   }
-  return TLguess;
-} 
+  int ix1 = static_cast<int>(x1_cm / m_CMperPixel);
+  int ix2 = static_cast<int>(x2_cm / m_CMperPixel);
+  int iy1 = static_cast<int>(y1_cm / m_CMperPixel);
+  int iy2 = static_cast<int>(y2_cm / m_CMperPixel);
+
+  if(m_crop_x1 >=0 && m_crop_x1 + ix1 <m_NXPixel ) m_pipe_x1 = m_crop_x1 + ix1;
+  if(m_crop_y1 >=0 && m_crop_y1 + iy1 <m_NYPixel ) m_pipe_y1 = m_crop_y1 + iy1;
+  if(m_crop_x2 >=0 && m_crop_x1 + ix2 <m_NXPixel ) m_pipe_x2 = m_crop_x1 + ix2;
+  if(m_crop_y2 >=0 && m_crop_y1 + iy2 <m_NYPixel ) m_pipe_y2 = m_crop_y1 + iy2;
+
+  return;
+}
+
 
 bool HFrame::isNegative(){
-  if(T_liquid < -998.){
-    std::cout<<"WARNING: liquid temperature is not set! Guess: ";
-    T_liquid = this -> guessTLiquid();
-    std::cout<< T_liquid <<std::endl;
+  if(m_T_liquid < -998.){
+    std::cout<<"ERROR: liquid temperature is not set! RETURN false! ";
+    return false;
   }
 
-  if(T_liquid < 20.){
+  if(m_T_liquid < 15.1){
     return true;
-  }else if(T_liquid > 26.){
+  }else if(m_T_liquid > 29.9){
     return false;
   }else{
-    std::cout<<"ERROR: liquid temperature is set to [20, 26], hard to decide the sign! Return false. "<<std::endl;
+    std::cout<<"ERROR: liquid temperature is set to [15, 30], hard to decide the sign! RETURN false! "<<std::endl;
     return false;
   }
 }

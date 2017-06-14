@@ -13,8 +13,6 @@
 #include "TCanvas.h"
 #include "TFile.h"
 
-#include "HFrame.h"
-
 class HPlot{
   private:
     TCanvas * fCurCanvas2D;
@@ -36,10 +34,10 @@ class HPlot{
     HPlot(){ 
       fCurCanvas1D = NULL; fCurCanvas2D = NULL;
       fSizeX = 1000.;
-      fSizeY = 400.;
+      fSizeY = 450.;
       fMarginL = 0.06;
       fMarginR = 0.11;
-      fMarginT = 0.05;
+      fMarginT = 0.07;
       fMarginB = 0.14;
       fOffsetX = 1.25;
       fOffsetY = 0.65;
@@ -63,6 +61,24 @@ class HPlot{
       fMarginT = top;
       fMarginB = bottom;
     }
+
+    void setLeftMargin(float left){
+      fMarginL = left;
+    }
+
+    void setRightMargin(float right){
+      fMarginR = right;
+    }
+
+    void setTopMargin(float top){
+      fMarginT = top;
+    }
+
+    void setBottomMargin(float bottom){
+      fMarginB = bottom;
+    }
+
+  
     void setOffset(float xaxis, float yaxis, float zaxis){
       fOffsetX = xaxis;
       fOffsetY = yaxis;
@@ -74,19 +90,16 @@ class HPlot{
       fLabelSizeZ = zaxis;
     }
  
-    bool drawFrame2D(HFrame * m_fbox, float ValMin = 999., float ValMax = -999.);
-    bool drawFramePipe2D(HFrame * m_fbox, float ValMin = 999., float ValMax = -999.);
-    bool drawFrame2D(TH2F * h2, float ValMin = 999., float ValMax = -999.);
-
-    // draw all the lines, having word "lname" into one plot
-    bool drawOneLine(HFrame * m_fbox, std::string lname);
-
-    // draw two lines, up, down
-    bool drawTwoPipes(HFrame * m_fbox, std::string lname);
-    bool drawTwoPipes(HFrame * m_fbox, std::string lname_up, std::string lname_down);
-    bool drawTwoPipes(TH1F* h_up, TH1F* h_down);
-
-    //one for each line
-    bool drawAllLine(HFrame * m_fbox);
+    /*
+     * plot mode (pMode) = 
+     * <=0: png only
+     * 1: pdf only
+     * 2: eps only
+     * 3: png + pdf
+     * 4: png + eps
+     * >=5: png + pdf + eps
+     */
+    bool drawHist2D(TH2F * h2, int pMode = 0, float ValMin = 999., float ValMax = -999.);
+    bool drawHistsUpDown(std::vector<TH1F*> h_ups, std::vector<TH1F*> h_downs);
 };
 #endif
