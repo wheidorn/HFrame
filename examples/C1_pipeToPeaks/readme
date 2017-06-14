@@ -1,0 +1,9 @@
+# the example uses the cooling pipes T profile as input to find the peaks and fit
+# the background. 
+# it assumes you have the input files under: 
+# --> roo/Pipes/StaveNo4_sL_80lens_m55.root
+# make sure you write the name of the folder under roo/ correctly into input.txt
+#
+# running:
+source run.sh
+

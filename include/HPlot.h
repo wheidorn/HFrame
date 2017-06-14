@@ -14,6 +14,13 @@
 #include "TFile.h"
 
 class HPlot{
+
+  /* class HPlot aim to
+   *
+   * -- draw nice plots for the stave T profile by resetting the margins, etc.
+   * -- add necessary information into the plot.
+   */
+  
   private:
     TCanvas * fCurCanvas2D;
     TCanvas * fCurCanvas1D;

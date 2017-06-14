@@ -1,0 +1,7 @@
+# the example converting the root files produced by .seq as input into an averaged T frame
+# it assumes you have the input files under: 
+# --> roo/longFlawRevNo4_sL_80lens_m55/seq_n?.root
+# make sure you write the name of the folder under roo/ correctly into input.txt
+#
+# to draw the plots after the 2D frame is produced, please go to
+# draw2D/ and run: source run.sh

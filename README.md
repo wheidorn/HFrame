@@ -1,4 +1,8 @@
 # HFrame
+
+> for details of the functions, check the include/H~.h files
+
+
 > 1) login to lxplus
 > source setup_lxplus.sh
 

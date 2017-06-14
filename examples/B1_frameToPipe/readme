@@ -1,0 +1,11 @@
+# the example uses the averaged T frame (produced by: A1_rooToFrames) to fit the peaks at the 
+# cross section of the cooling pipes to obtain the whole cooling pipe temperature.
+# it assumes you have the input files under: 
+# --> roo/combined/longFlawRevNo4_sL_80lens_m55.root
+# make sure you write the name of the folder under roo/ correctly into input.txt
+#
+# running:
+source run.sh
+
+# results under roo/Pipes/.
+

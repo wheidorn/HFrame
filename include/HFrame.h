@@ -15,14 +15,34 @@
 
 class HFrame
 {
-
+  /* class HFrame aim to do
+   * - convert a raw image from IR camera to a frame, which fits the stave 
+   * --- see function findCropPositions(...) by feeding x size (cm) and y size of the frame.
+   * --- the coordinates is from 0 (left) of the frame.
+   *
+   *       |-|
+   *       | --------|
+   * (0,0) |---------| (Xmax,0)
+   *
+   *
+   * - zoom a frame image to a smaller area including only two pipes.
+   * --- see function findPipePositions(...) by feeding x size (cm) and y size of the pipe zoom area.
+   *
+   * - rotate the frame by 90, 180, 270 degrees
+   * --- see function rotate(...)
+   *
+   * - mirror reflection of the frame
+   * --- see function mirror(...)
+   *
+   * - store the results
+   * --- see functions writeToRootFile(...) and print(...)
+   *
+   */
   private:
     /*
      * temperature data in 2D
      */
     std::vector<std::vector<float>> m_data;
-    //float m_data_min;
-    //float m_data_max;
 
     /* 
      * frame name
