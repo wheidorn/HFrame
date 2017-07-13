@@ -12,7 +12,7 @@ SRCEXT=cpp
 SOURCES=$(shell find $(SRCDIR) -type f -name *.$(SRCEXT))
 OBJECTS=$(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.o))
 CFLAGS=-g $(SPECIALFLAGS) $(ROOTCFLAGS) # -Wall 
-LIB=$(ROOTLIBS) # "-L lib" # uncomment it if lib/ is not empty!
+LIB=$(ROOTLIBS) -lSpectrum # "-L lib" # uncomment it if lib/ is not empty!
 INC=-I include
 
 $(TARGET): $(OBJECTS)
