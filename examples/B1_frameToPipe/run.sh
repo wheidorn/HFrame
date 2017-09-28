@@ -5,8 +5,8 @@
 #export DYLD_LIBRARY_PATH=$PWD/../bin:$DYLD_LIBRARY_PATH
 
 
-gmake clean
-gmake
+make clean
+make
 if [[ $? != 0 ]]; then
   break
 fi

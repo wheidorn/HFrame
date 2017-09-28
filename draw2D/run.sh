@@ -1,8 +1,8 @@
 #/bin/bash
 
 
-gmake clean
-gmake
+make clean
+make
 if [[ $? != 0 ]]; then
   break
 fi

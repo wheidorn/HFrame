@@ -3,8 +3,8 @@
 # in case of error, you should add the path like (depending on your OS):
 #export DYLD_LIBRARY_PATH=$PWD/../bin:$DYLD_LIBRARY_PATH
 
-gmake clean
-gmake
+make clean
+make
 if [[ $? != 0 ]]; then
   break
 fi
