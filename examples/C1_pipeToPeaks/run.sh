@@ -10,7 +10,7 @@ if [[ $? != 0 ]]; then
   break
 fi
 
-mkdir -p plot
+mkdir -p ../../plot
 while read file stavename temp side; do 
 
   if [[ "${file}" == "" ]]; then continue; fi
@@ -23,7 +23,7 @@ while read file stavename temp side; do
   echo running $stavename
 
   ./dana -name $stavename
-  mkdir -p plot/$stavename
-  mv *.png *.pdf plot/$stavename
+  mkdir -p ../../plot/$stavename
+  mv *.png *.pdf ../../plot/$stavename
 
-done < input.txt
+done < ../../input.txt

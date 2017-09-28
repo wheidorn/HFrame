@@ -9,7 +9,7 @@ if [[ $? != 0 ]]; then
   break
 fi
 
-mkdir -p roo/combined
+mkdir -p ../../roo/combined
 
 while read file stavename temp side; do 
 
@@ -23,7 +23,7 @@ while read file stavename temp side; do
   echo running $stavename
 
   ./dana -name $file
-  mv out.txt roo/combined/${file}.txt
-  ls -l roo/combined/${file}.*
+  mv out.txt ../../roo/combined/${file}.txt #Moved both of these to the main folder
+  ls -l ../../roo/combined/${file}.*
 
-done < input.txt
+done < ../../input.txt

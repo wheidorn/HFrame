@@ -15,3 +15,20 @@
 >  ./dana;
 
 > 4) check examples/ for starting running jobs.
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+//
+//
+//                 This is an updated version of the HFrame Code
+//                 Author: Jie Yu
+//                 Editor: Will Heidorn
+//
+//
+//
+///////////////////////////////////////////////////////////////////////////////
+
+This code reads output from the seqToRoot program written by Jie Yu.
+
+

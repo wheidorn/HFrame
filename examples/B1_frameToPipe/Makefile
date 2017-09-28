@@ -5,7 +5,7 @@ SPECIALFLAGS=-O3 -std=c++11 -stdlib=libc++
 ROOTCFLAGS=$(shell root-config --cflags)
 ROOTLIBS=$(shell root-config --libs)
 
-HFramesDir=$(pwd)/../../HFrames
+HFramesDir=$(pwd)../../
 
 CFLAGS = $(SPECIALFLAGS) -I. -I$(HFramesDir)/include
 LFLAGS = -L. -L$(HFramesDir)/bin -lhframe

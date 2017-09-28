@@ -26,7 +26,7 @@ int main(int argc, char* argv[]){
 
 
   // read the file name
-  std::string sfolder = "roo";
+  std::string sfolder = "../../roo"; // Add in two folders
   std::string sfile = "";
   for (int i1 = 1; i1<argc; ++i1) {
     if (strcmp(argv[i1],"-name")==0) { i1++; sfile = string(argv[i1]); continue;}
